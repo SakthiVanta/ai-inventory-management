@@ -93,8 +93,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <header className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0 bg-card/30 backdrop-blur-md z-20">
                 <div className="flex items-center gap-4">
                     <div className="font-bold text-lg tracking-tight text-foreground flex items-center gap-2">
-                        <div className="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center text-xs shadow-sm">A</div>
-                        ASD PHARR
+                        <div className="w-8 h-8 rounded shrink-0 bg-primary/10 flex items-center justify-center p-1 shadow-sm overflow-hidden">
+                            <img src="/logo.png" alt="PHARR Logo" className="w-full h-full object-contain" />
+                        </div>
+                        PHARR
                     </div>
                     <div className="h-4 w-[1px] bg-border mx-2" />
                     <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">

@@ -24,7 +24,10 @@ export default async function LoginPage() {
                 <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px] pointer-events-none" />
 
                 <div className="relative z-10 p-12 max-w-lg text-center flex flex-col items-center">
-                    <h1 className="text-5xl font-bold mb-4 tracking-tight drop-shadow-sm text-foreground">ASD PHARR</h1>
+                    <div className="w-16 h-16 mb-6 rounded-2xl bg-primary/10 flex items-center justify-center p-3 shadow-inner overflow-hidden border border-primary/20">
+                        <img src="/logo.png" alt="PHARR Logo" className="w-full h-full object-contain filter drop-shadow-md" />
+                    </div>
+                    <h1 className="text-5xl font-bold mb-4 tracking-tight drop-shadow-sm text-foreground">PHARR</h1>
                     <p className="text-muted-foreground text-xl mb-12 max-w-sm">
                         AI-Powered Inventory Orchestration & Compliance Monitoring.
                     </p>

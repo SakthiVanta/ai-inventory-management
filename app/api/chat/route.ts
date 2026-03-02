@@ -328,7 +328,7 @@ export async function POST(req: NextRequest) {
         let systemPrompt: string;
 
         if (isExternal) {
-            systemPrompt = `You are ASD PHARR, a pharmaceutical inventory AI assistant.
+            systemPrompt = `You are PHARR, a pharmaceutical inventory AI assistant.
 The current date/time is: ${new Date().toISOString()}
 
 You are connected to the user's EXTERNAL database (read-only access).
@@ -344,7 +344,7 @@ ${JSON.stringify(schema.tables, null, 2)}
 CURRENT QUERY DATA:
 ${queryResult?.data ? JSON.stringify(queryResult.data, null, 2) : 'Not queried yet'}`;
         } else {
-            systemPrompt = `You are ASD PHARR, a pharmaceutical inventory AI assistant.
+            systemPrompt = `You are PHARR, a pharmaceutical inventory AI assistant.
 
 You are connected to the internal inventory database with RESTRICTED access.
 The current date/time is: ${new Date().toISOString()}

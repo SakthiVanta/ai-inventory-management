@@ -6,7 +6,7 @@ export async function POST() {
     try {
         // Generate a new secret
         const secret = speakeasy.generateSecret({
-            name: 'ASD PHARR',
+            name: 'PHARR',
             length: 32,
         });
 

@@ -16,7 +16,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ASD PHARR - Inventory Orchestration",
+  title: "PHARR - AI Inventory Orchestration",
   description: "AI-powered dynamic inventory orchestration platform",
 };
 
