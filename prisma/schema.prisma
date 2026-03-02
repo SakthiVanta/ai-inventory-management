@@ -44,6 +44,7 @@ model ChatMessage {
   sessionId   String
   role        String
   content     String
+  metadata    Json?
   timestamp   DateTime    @default(now())
   ChatSession ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 

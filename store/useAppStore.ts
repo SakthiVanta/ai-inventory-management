@@ -26,6 +26,7 @@ export interface ChatMessage {
     role: "user" | "assistant";
     content: string;
     timestamp: string;
+    metadata?: any;
 }
 
 export interface ChatSession {

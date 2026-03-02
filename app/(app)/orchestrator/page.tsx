@@ -14,6 +14,12 @@ interface ChatMessage {
     id: string;
     role: "user" | "assistant";
     content: string;
+    metadata?: {
+        type: 'insert' | 'update' | 'delete';
+        data: any;
+        id?: string;
+        status: 'pending' | 'accepted' | 'rejected' | 'executed';
+    };
 }
 
 interface ThinkingStep {
@@ -61,13 +67,7 @@ export default function OrchestratorPage() {
         }
     }, [currentSessionId]);
 
-    // Save messages to session
-    useEffect(() => {
-        if (currentSessionId && messages?.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            addMessageToSession(currentSessionId, { ...lastMessage, timestamp: new Date().toISOString() });
-        }
-    }, [messages]);
+    // Messages are now saved explicitly in handleSubmit and addMessageToSession
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -121,6 +121,11 @@ export default function OrchestratorPage() {
         setMessages((prev) => [...prev, userMessage]);
         setInput("");
         setIsLoading(true);
+
+        // Save user message to session immediately to prevent loss/duplicates
+        if (currentSessionId) {
+            addMessageToSession(currentSessionId, { ...userMessage, timestamp: new Date().toISOString() });
+        }
 
         // Initialize thinking steps with dynamic details
         const userIntent = input.toLowerCase();
@@ -244,8 +249,26 @@ export default function OrchestratorPage() {
             updateThinkingStep('4', 'completed');
 
             const payload = extractJSONFromResponse(fullResponse);
-            if (payload && payload.action === 'insert' && payload.table === 'inventory') {
-                await handleInventoryInsert(payload.data, userMessage.content, fullResponse);
+            const assistantMessage: ChatMessage = {
+                id: assistantId,
+                role: "assistant",
+                content: fullResponse,
+                metadata: payload ? {
+                    type: payload.action,
+                    data: payload.data,
+                    id: payload.id,
+                    status: 'pending'
+                } : undefined
+            };
+
+            // Update local state with final message (including metadata)
+            setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? assistantMessage : m))
+            );
+
+            // Save assistant message to session
+            if (currentSessionId) {
+                addMessageToSession(currentSessionId, { ...assistantMessage, action: assistantMessage.metadata, timestamp: new Date().toISOString() } as any);
             }
 
             const tokens = Math.ceil((input.length + fullResponse.length) / 4);
@@ -272,27 +295,49 @@ export default function OrchestratorPage() {
         }
     };
 
+    const handleAcceptAction = async (msgId: string, metadata: NonNullable<ChatMessage['metadata']>) => {
+        setMessages(prev => prev.map(m =>
+            m.id === msgId && m.metadata ? { ...m, metadata: { ...m.metadata, status: 'accepted' } } : m
+        ));
+
+        try {
+            if (metadata.type === 'insert') {
+                await handleInventoryInsert(metadata.data, "", "");
+            }
+            // Add update/delete logic here if needed
+
+            setMessages(prev => prev.map(m =>
+                m.id === msgId && m.metadata ? { ...m, metadata: { ...m.metadata, status: 'executed' } } : m
+            ));
+        } catch (error) {
+            setMessages(prev => prev.map(m =>
+                m.id === msgId && m.metadata ? { ...m, metadata: { ...m.metadata, status: 'pending' } } : m
+            ));
+        }
+    };
+
+    const handleRejectAction = (msgId: string) => {
+        setMessages(prev => prev.map(m =>
+            m.id === msgId && m.metadata ? { ...m, metadata: { ...m.metadata, status: 'rejected' } } : m
+        ));
+        toast.info("Action declined");
+    };
+
     const handleInventoryInsert = async (data: any, prompt: string, response: string) => {
         try {
             const validationErrors = [];
             if (!data.item_name) validationErrors.push('item_name is required');
-            if (!data.quantity && data.quantity !== 0) validationErrors.push('quantity is required');
+            if (data.quantity === undefined || data.quantity === null) validationErrors.push('quantity is required');
             if (data.quantity < 0) validationErrors.push('quantity cannot be negative');
 
-            const isMedicalItem = prompt.toLowerCase().includes('medicine') ||
-                prompt.toLowerCase().includes('drug') ||
-                prompt.toLowerCase().includes('pharma') ||
-                data.ndc_code;
-
-            if (isMedicalItem) {
-                if (!data.batch_number) validationErrors.push('batch_number is required');
-                if (!data.expiry_date) validationErrors.push('expiry_date is required');
-                if (!data.ndc_code) validationErrors.push('ndc_code is required');
-            }
+            // Pharmaceutical validation
+            if (!data.batch_number) validationErrors.push('batch_number is required');
+            if (!data.expiry_date) validationErrors.push('expiry_date is required');
+            if (!data.ndc_code) validationErrors.push('ndc_code is required');
 
             if (validationErrors.length > 0) {
-                toast.warning(`Validation: ${validationErrors.join(', ')}`);
-                return;
+                toast.warning(`Compliance Alert: ${validationErrors.join(', ')}`);
+                throw new Error("Validation failed");
             }
 
             if (dbConnection.connected) {
@@ -301,17 +346,21 @@ export default function OrchestratorPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data),
                 });
-                if (!res.ok) throw new Error('Failed to save');
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || 'Failed to save');
+                }
                 const savedItem = await res.json();
                 addInventoryItem(savedItem);
-                toast.success(`Added ${data.item_name}`);
+                toast.success(`Successfully added ${data.item_name} to Master Inventory`);
             } else {
                 const newItem = { id: crypto.randomUUID(), data, createdAt: new Date().toISOString() };
                 addInventoryItem(newItem);
-                toast.success(`Added ${data.item_name} (local only)`);
+                toast.success(`Added ${data.item_name} (Local Session Only)`);
             }
         } catch (error: any) {
-            toast.error(`Failed: ${error.message}`);
+            toast.error(error.message);
+            throw error;
         }
     };
 
@@ -399,10 +448,68 @@ export default function OrchestratorPage() {
                         </div>
                     ) : (
                         messages.map((m) => (
-                            <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[95%] p-3 rounded-xl shadow-sm whitespace-pre-wrap ${m.role === "user" ? "bg-primary/10 text-foreground border border-primary/20 ml-auto" : "bg-muted/30 text-foreground border border-border"}`}>
-                                    <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                            <div key={m.id} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                                <div className={`max-w-[95%] p-3 rounded-xl shadow-sm whitespace-pre-wrap ${m.role === "user" ? "bg-primary/10 text-foreground border border-primary/20" : "bg-muted/30 text-foreground border border-border"}`}>
+                                    <p className="text-sm">{m.content}</p>
                                 </div>
+
+                                {m.metadata && m.metadata.status !== 'rejected' && (
+                                    <div className="mt-2 w-full max-w-[400px]">
+                                        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="bg-primary/5 px-3 py-2 border-b border-border flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Database className="w-4 h-4 text-primary" />
+                                                    <span className="text-xs font-semibold uppercase tracking-wider">Proposed {m.metadata.type} Action</span>
+                                                </div>
+                                                <Badge variant="outline" className="text-[10px]">{m.metadata.status.toUpperCase()}</Badge>
+                                            </div>
+                                            <div className="p-3">
+                                                <div className="space-y-1 mb-4">
+                                                    {Object.entries(m.metadata.data).map(([key, value]: [string, any]) => (
+                                                        <div key={key} className="flex justify-between text-[11px] border-b border-border/50 py-1 last:border-0">
+                                                            <span className="text-muted-foreground capitalize">{key.replace('_', ' ')}</span>
+                                                            <span className="font-medium">{String(value)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {m.metadata.status === 'pending' && (
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                            onClick={() => handleAcceptAction(m.id, m.metadata!)}
+                                                        >
+                                                            Accept & Execute
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="flex-1 h-8 text-xs border-destructive/20 text-destructive hover:bg-destructive/10"
+                                                            onClick={() => handleRejectAction(m.id)}
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                {m.metadata.status === 'accepted' && (
+                                                    <div className="flex items-center justify-center py-2 text-emerald-500 gap-2">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        <span className="text-xs font-medium">Executing...</span>
+                                                    </div>
+                                                )}
+
+                                                {m.metadata.status === 'executed' && (
+                                                    <div className="flex items-center justify-center py-2 text-emerald-500 gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                        <span className="text-xs font-medium">Successfully Synced</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}

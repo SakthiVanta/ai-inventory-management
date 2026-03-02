@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (auth instanceof Response) return auth;
 
     try {
-        const { sessionId, role, content } = await req.json();
+        const { sessionId, role, content, action } = await req.json();
 
         if (!sessionId || !role || !content) {
             return NextResponse.json(
@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
                 sessionId,
                 role,
                 content,
+                metadata: action || null,
             },
         });
 
