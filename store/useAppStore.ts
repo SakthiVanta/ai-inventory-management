@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 export interface User {
     id: string;
     email: string;
-    company: string;
+    company: string | null;
     name: string;
 }
 
@@ -43,11 +43,10 @@ interface AppState {
     tokenUsage: number;
     incrementTokenUsage: (amount: number) => void;
 
-    // AI Provider API Keys
-    aiProviders: AIProvider[];
-    setAIProviders: (providers: AIProvider[]) => void;
-    updateProviderKey: (id: string, apiKey: string) => void;
-    getActiveProviderKey: () => string | null;
+    // AI Providers
+    aiProviders: Array<{ id: string; name: string; apiKey: string; modelName: string; isActive: boolean }>;
+    setAIProviders: (providers: any[]) => void;
+    updateProviderKey: (providerId: string, apiKey: string) => void;
 
     // Project State
     projectContext: string;
@@ -57,32 +56,34 @@ interface AppState {
     dbConnection: DBConnection;
     setDBConnection: (connection: DBConnection) => void;
 
-    // Authentication
+    // Authentication (synced with server session)
     user: User | null;
     isAuthenticated: boolean;
     is2FAEnabled: boolean;
-    login: (user: User) => void;
-    logout: () => void;
-    set2FAEnabled: (enabled: boolean) => void;
+    setUser: (user: User | null) => void;
+    setIsAuthenticated: (value: boolean) => void;
+    setIs2FAEnabled: (enabled: boolean) => void;
+    logout: () => Promise<void>;
 
-    // Inventory (real data)
+    // Inventory (now loaded from server)
     inventory: any[];
     setInventory: (items: any[]) => void;
     addInventoryItem: (item: any) => void;
 
-    // Audit Log
-    auditLogs: any[];
-    addAuditLog: (log: any) => void;
-
-    // Chat Sessions
+    // Chat Sessions (now loaded from server)
     chatSessions: ChatSession[];
     currentSessionId: string | null;
-    createNewSession: () => string;
-    addMessageToSession: (sessionId: string, message: ChatMessage) => void;
-    updateSessionTitle: (sessionId: string, title: string) => void;
-    deleteSession: (sessionId: string) => void;
     setCurrentSession: (sessionId: string | null) => void;
-    getCurrentSession: () => ChatSession | null;
+    addMessageToCurrentSession: (message: ChatMessage) => void;
+    createNewSession: () => Promise<void>;
+    addMessageToSession: (sessionId: string, message: ChatMessage) => void;
+    deleteSession: (sessionId: string) => Promise<void>;
+    getCurrentSession: () => ChatSession | undefined;
+
+    // Audit Logs (immutable records)
+    auditLogs: any[];
+    setAuditLogs: (logs: any[]) => void;
+    addAuditLog: (log: any) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -96,19 +97,16 @@ export const useAppStore = create<AppState>()(
 
             // AI Providers
             aiProviders: [
-                { id: 'google', name: 'Google Gemini', apiKey: '', isActive: true },
-                { id: 'openai', name: 'OpenAI', apiKey: '', isActive: false },
-                { id: 'anthropic', name: 'Anthropic', apiKey: '', isActive: false },
+                { id: "google", name: "Google Gemini", apiKey: "", modelName: "gemini-2.5-flash", isActive: true },
+                { id: "openai", name: "OpenAI", apiKey: "", modelName: "gpt-4o", isActive: false },
+                { id: "anthropic", name: "Anthropic", apiKey: "", modelName: "claude-3.5-sonnet", isActive: false },
             ],
             setAIProviders: (providers) => set({ aiProviders: providers }),
-            updateProviderKey: (id, apiKey) => set((state) => ({
-                aiProviders: state.aiProviders.map(p => p.id === id ? { ...p, apiKey } : p)
+            updateProviderKey: (providerId, apiKey) => set((state) => ({
+                aiProviders: state.aiProviders.map(p =>
+                    p.id === providerId ? { ...p, apiKey } : p
+                )
             })),
-            getActiveProviderKey: () => {
-                const state = get();
-                const activeProvider = state.aiProviders.find(p => p.isActive);
-                return activeProvider?.apiKey || null;
-            },
 
             // Project
             projectContext: 'New Project',
@@ -125,67 +123,130 @@ export const useAppStore = create<AppState>()(
             user: null,
             isAuthenticated: false,
             is2FAEnabled: false,
-            login: (user) => set({ user, isAuthenticated: true }),
-            logout: () => set({ user: null, isAuthenticated: false, is2FAEnabled: false, chatSessions: [], currentSessionId: null }),
-            set2FAEnabled: (enabled) => set({ is2FAEnabled: enabled }),
+            setUser: (user) => set({ user }),
+            setIsAuthenticated: (value) => set({ isAuthenticated: value }),
+            setIs2FAEnabled: (enabled) => set({ is2FAEnabled: enabled }),
+            logout: async () => {
+                try {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                } catch (e) {
+                    console.error('Logout error:', e);
+                }
+                set({
+                    user: null,
+                    isAuthenticated: false,
+                    is2FAEnabled: false,
+                    chatSessions: [],
+                    currentSessionId: null,
+                    inventory: [],
+                    auditLogs: [],
+                });
+            },
 
             // Inventory
             inventory: [],
             setInventory: (items) => set({ inventory: items }),
             addInventoryItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
 
-            // Audit Logs
-            auditLogs: [],
-            addAuditLog: (log) => set((state) => ({ auditLogs: [log, ...state.auditLogs] })),
-
-            // Chat Sessions
+            // Chat Sessions (client-side cache only - server is source of truth)
             chatSessions: [],
             currentSessionId: null,
-            createNewSession: () => {
-                const newSession: ChatSession = {
-                    id: crypto.randomUUID(),
-                    title: 'New Conversation',
-                    messages: [],
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                };
-                set((state) => ({
-                    chatSessions: [newSession, ...state.chatSessions],
-                    currentSessionId: newSession.id,
-                }));
-                return newSession.id;
-            },
-            addMessageToSession: (sessionId, message) => set((state) => ({
-                chatSessions: state.chatSessions.map((session) =>
-                    session.id === sessionId
-                        ? {
-                            ...session,
-                            messages: [...session.messages, message],
-                            updatedAt: new Date().toISOString(),
-                            title: session.messages.length === 0 && message.role === 'user'
-                                ? message.content.slice(0, 30) + (message.content.length > 30 ? '...' : '')
-                                : session.title
-                        }
-                        : session
-                ),
-            })),
-            updateSessionTitle: (sessionId, title) => set((state) => ({
-                chatSessions: state.chatSessions.map((session) =>
-                    session.id === sessionId ? { ...session, title } : session
-                ),
-            })),
-            deleteSession: (sessionId) => set((state) => ({
-                chatSessions: state.chatSessions.filter((session) => session.id !== sessionId),
-                currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId,
-            })),
             setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
+            addMessageToCurrentSession: (message) => set((state) => {
+                if (!state.currentSessionId) return state;
+
+                return {
+                    chatSessions: state.chatSessions.map((session) =>
+                        session.id === state.currentSessionId
+                            ? {
+                                ...session,
+                                messages: [...session.messages, message],
+                                updatedAt: new Date().toISOString(),
+                            }
+                            : session
+                    ),
+                };
+            }),
+            createNewSession: async () => {
+                const response = await fetch('/api/chat/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: 'New Conversation' }),
+                });
+                if (response.ok) {
+                    const session = await response.json();
+                    // Ensure messages array exists
+                    const newSession = { ...session, messages: session.messages || [] };
+                    set((state) => ({
+                        chatSessions: [newSession, ...state.chatSessions],
+                        currentSessionId: newSession.id,
+                    }));
+                }
+            },
+            addMessageToSession: async (sessionId, message) => {
+                const response = await fetch('/api/chat/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...message, sessionId }),
+                });
+                if (response.ok) {
+                    const savedMessage = await response.json();
+                    set((state) => ({
+                        chatSessions: state.chatSessions.map((session) =>
+                            session.id === sessionId
+                                ? {
+                                    ...session,
+                                    messages: [...(session.messages || []), savedMessage],
+                                    updatedAt: new Date().toISOString(),
+                                }
+                                : session
+                        ),
+                    }));
+                }
+            },
+            deleteSession: async (sessionId) => {
+                await fetch(`/api/chat/sessions?id=${sessionId}`, { method: 'DELETE' });
+                set((state) => ({
+                    chatSessions: state.chatSessions.filter((s) => s.id !== sessionId),
+                    currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId,
+                }));
+            },
             getCurrentSession: () => {
                 const state = get();
-                return state.chatSessions.find((s) => s.id === state.currentSessionId) || null;
+                return state.chatSessions.find((s) => s.id === state.currentSessionId);
             },
+
+            // Audit Logs - using a simple state approach; will batch-sync when API is ready
+            auditLogs: [],
+            setAuditLogs: (logs) => set({ auditLogs: logs }),
+            addAuditLog: (log) => set((state) => ({ auditLogs: [log, ...state.auditLogs] })),
         }),
         {
             name: 'asd-pharr-storage',
+            // Don't persist sensitive auth data - rely on HTTP-only cookie
+            partialize: (state) => ({
+                activeModel: state.activeModel,
+                projectContext: state.projectContext,
+                dbConnection: state.dbConnection,
+                is2FAEnabled: state.is2FAEnabled,
+                aiProviders: state.aiProviders,
+                // Don't persist: user, isAuthenticated, inventory, chatSessions
+            }),
         }
     )
 );
+
+// Helper to fetch current user on app load
+export async function fetchCurrentUser(): Promise<User | null> {
+    try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+            const data = await response.json();
+            return data.user;
+        }
+        return null;
+    } catch (e) {
+        console.error('Failed to fetch current user:', e);
+        return null;
+    }
+}

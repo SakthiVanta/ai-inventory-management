@@ -28,7 +28,7 @@ const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transiti
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, logout, is2FAEnabled, set2FAEnabled } = useAppStore();
+    const { user, logout, is2FAEnabled, setIs2FAEnabled } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [isDisabling2FA, setIsDisabling2FA] = useState(false);
@@ -96,7 +96,7 @@ export default function ProfilePage() {
         setIsDisabling2FA(true);
         try {
             await new Promise(resolve => setTimeout(resolve, 500));
-            set2FAEnabled(false);
+            setIs2FAEnabled(false);
             toast.success("2FA disabled successfully");
         } catch (err) {
             toast.error("Failed to disable 2FA");

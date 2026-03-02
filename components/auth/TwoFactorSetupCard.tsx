@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 export function TwoFactorSetupCard() {
     const router = useRouter();
-    const { set2FAEnabled, user } = useAppStore();
+    const { setIs2FAEnabled, user } = useAppStore();
     const [qrCodeUrl, setQrCodeUrl] = useState("");
     const [secret, setSecret] = useState("");
     const [token, setToken] = useState("");
@@ -70,7 +70,7 @@ export function TwoFactorSetupCard() {
 
             if (!response.ok) throw new Error('Invalid token');
 
-            set2FAEnabled(true);
+            setIs2FAEnabled(true);
             toast.success("2FA enabled successfully!");
             router.push("/onboarding");
         } catch (err) {

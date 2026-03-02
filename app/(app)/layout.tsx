@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BrainCircuit, Database, ShieldAlert, Activity, Settings, TableProperties, User, LogOut } from "lucide-react";
-import { useAppStore } from "@/store/useAppStore";
+import { useAppStore, fetchCurrentUser } from "@/store/useAppStore";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -18,10 +19,37 @@ import { toast } from "sonner";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { activeModel, tokenUsage, projectContext, user, logout, is2FAEnabled } = useAppStore();
+    const [isLoading, setIsLoading] = useState(true);
+    const {
+        activeModel,
+        tokenUsage,
+        projectContext,
+        user,
+        isAuthenticated,
+        is2FAEnabled,
+        setUser,
+        setIsAuthenticated,
+        logout
+    } = useAppStore();
 
-    const handleLogout = () => {
-        logout();
+    // Check auth on mount
+    useEffect(() => {
+        const checkAuth = async () => {
+            const currentUser = await fetchCurrentUser();
+            if (currentUser) {
+                setUser(currentUser);
+                setIsAuthenticated(true);
+            } else {
+                // Redirect to login if not authenticated
+                router.push("/login");
+            }
+            setIsLoading(false);
+        };
+        checkAuth();
+    }, [router, setUser, setIsAuthenticated]);
+
+    const handleLogout = async () => {
+        await logout();
         toast.success("Logged out successfully");
         router.push("/login");
     };
@@ -35,7 +63,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { name: "Settings", href: "/settings/providers", icon: Settings },
     ];
 
-    // Get user initials
     const getInitials = (name: string) => {
         return name
             ?.split(' ')
@@ -44,6 +71,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             .toUpperCase()
             .slice(0, 2) || 'U';
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return null; // Will redirect to login
+    }
 
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
@@ -152,7 +194,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     })}
                 </aside>
 
-                <main className="flex-1 overflow-hidden relative bg-background">
+                {/* Content */}
+                <main className="flex-1 overflow-auto p-6">
                     {children}
                 </main>
             </div>

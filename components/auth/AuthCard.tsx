@@ -14,7 +14,7 @@ type AuthMode = "login" | "signup";
 
 export function AuthCard() {
     const router = useRouter();
-    const { login } = useAppStore();
+    const { setUser, setIsAuthenticated } = useAppStore();
     const [mode, setMode] = useState<AuthMode>("login");
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -60,26 +60,40 @@ export function AuthCard() {
         setError("");
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
 
-            const user = {
-                id: crypto.randomUUID(),
-                email: formData.email,
-                company: mode === "signup" ? formData.company : formData.email.split('@')[1]?.split('.')[0] || "Unknown",
-                name: mode === "signup" ? (formData.name || formData.email.split('@')[0]) : formData.email.split('@')[0],
-            };
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: formData.email,
+                    password: formData.password,
+                    company: formData.company,
+                    name: formData.name,
+                }),
+            });
 
-            login(user);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Authentication failed");
+            }
+
+            // Update client state
+            setUser(data.user);
+            setIsAuthenticated(true);
 
             if (mode === "login") {
                 toast.success("Welcome back!");
                 router.push("/orchestrator");
+                router.refresh();
             } else {
                 toast.success("Account created successfully!");
                 router.push("/setup-2fa");
+                router.refresh();
             }
-        } catch (err) {
-            setError(mode === "login" ? "Invalid email or password. Please try again." : "Failed to create account. Please try again.");
+        } catch (err: any) {
+            setError(err.message || "Authentication failed. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -148,52 +162,52 @@ export function AuthCard() {
                                     type="text"
                                     name="name"
                                     required
-                                    placeholder="Dr. John Smith"
-                                    className="pl-10 h-11 bg-background"
+                                    placeholder="John Doe"
                                     value={formData.name}
                                     onChange={handleChange}
+                                    className="pl-10 bg-background/50 border-border focus:border-primary focus:ring-primary"
                                 />
                             </div>
                         </div>
                     )}
 
-                    {/* Work Email - Both Modes */}
+                    {/* Email */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Work Email</label>
+                        <label className="text-sm font-medium text-foreground">Email Address</label>
                         <div className="relative">
                             <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="email"
                                 name="email"
                                 required
-                                placeholder="dr.smith@pharma.corp"
-                                className="pl-10 h-11 bg-background"
+                                placeholder="you@company.com"
                                 value={formData.email}
                                 onChange={handleChange}
+                                className="pl-10 bg-background/50 border-border focus:border-primary focus:ring-primary"
                             />
                         </div>
                     </div>
 
-                    {/* Company Name - Sign Up Only */}
+                    {/* Company - Sign Up Only */}
                     {!isLogin && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">Company Name</label>
+                            <label className="text-sm font-medium text-foreground">Company</label>
                             <div className="relative">
                                 <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     type="text"
                                     name="company"
                                     required
-                                    placeholder="PharmaCorp Inc."
-                                    className="pl-10 h-11 bg-background"
+                                    placeholder="Your Company Ltd"
                                     value={formData.company}
                                     onChange={handleChange}
+                                    className="pl-10 bg-background/50 border-border focus:border-primary focus:ring-primary"
                                 />
                             </div>
                         </div>
                     )}
 
-                    {/* Password - Both Modes */}
+                    {/* Password */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Password</label>
                         <div className="relative">
@@ -202,57 +216,74 @@ export function AuthCard() {
                                 type={showPassword ? "text" : "password"}
                                 name="password"
                                 required
+                                placeholder="••••••••"
                                 value={formData.password}
                                 onChange={handleChange}
-                                placeholder="••••••••••••••••"
-                                className="pl-10 pr-10 h-11 bg-background"
+                                className="pl-10 pr-10 bg-background/50 border-border focus:border-primary focus:ring-primary"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
                             >
                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                         </div>
-                        {/* Password Strength Meter - Sign Up Only */}
-                        {!isLogin && formData.password.length > 0 && (
-                            <div className="pt-2">
-                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        {/* Password Strength Bar */}
+                        {!isLogin && (
+                            <div className="space-y-1">
+                                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
                                     <div
-                                        className={`h-full transition-all duration-300 ${strength < 50 ? "bg-destructive" : strength < 100 ? "bg-yellow-500" : "bg-primary"
-                                            }`}
+                                        className={`h-full transition-all duration-300 ${strength < 50 ? 'bg-destructive' : strength < 75 ? 'bg-yellow-500' : 'bg-green-500'}`}
                                         style={{ width: `${strength}%` }}
                                     />
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 text-right">
-                                    {strength < 50 ? "Weak - Add symbols & numbers" : strength < 100 ? "Good" : "Strong - Compliant"}
+                                <p className="text-xs text-muted-foreground">
+                                    Password strength: {strength < 50 ? 'Weak' : strength < 75 ? 'Fair' : 'Strong'}
                                 </p>
                             </div>
                         )}
                     </div>
                 </CardContent>
 
-                <CardFooter className="flex-col gap-4">
+                <CardFooter className="flex flex-col gap-3">
                     <Button
                         type="submit"
-                        size="lg"
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                         disabled={isLoading}
-                        className="w-full mt-2 font-semibold shadow-sm hover:shadow-md transition-shadow disabled:opacity-50"
                     >
                         {isLoading ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isLogin ? "Signing In..." : "Creating Account..."}</>
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {isLogin ? "Signing in..." : "Creating account..."}
+                            </>
                         ) : (
-                            isLogin ? "Sign In" : "Create Account"
+                            <>
+                                {isLogin ? <LogIn className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                                {isLogin ? "Sign In" : "Create Account"}
+                            </>
                         )}
                     </Button>
-                    <p className="text-sm text-center text-muted-foreground">
-                        {isLogin ? (
-                            <>Don&apos;t have an account? <button type="button" onClick={toggleMode} className="text-primary hover:underline">Sign up</button></>
-                        ) : (
-                            <>Already have an account? <button type="button" onClick={toggleMode} className="text-primary hover:underline">Sign in</button></>
-                        )}
+
+                    <p className="text-sm text-muted-foreground text-center">
+                        {isLogin ? "Don't have an account? " : "Already have an account? "}
+                        <button
+                            type="button"
+                            onClick={toggleMode}
+                            className="text-primary hover:underline font-medium"
+                        >
+                            {isLogin ? "Sign up" : "Sign in"}
+                        </button>
                     </p>
+
+                    {isLogin && (
+                        <Link
+                            href="#"
+                            className="text-sm text-muted-foreground hover:text-foreground text-center"
+                        >
+                            Forgot password?
+                        </Link>
+                    )}
                 </CardFooter>
             </form>
         </Card>

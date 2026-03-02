@@ -7,52 +7,24 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  company   String?
-  password  String
-  createdAt DateTime  @default(now())
-  sessions  Session[]
-}
-
-model Session {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  token     String   @unique
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-}
-
 model AIProviderConfig {
-  id               String   @id @default(uuid())
+  id               String   @id @default(cuid())
+  userId           String
   name             String
   apiKey           String
   modelName        String
   maxContextTokens Int
   isActive         Boolean  @default(false)
   createdAt        DateTime @default(now())
-}
+  updatedAt        DateTime @updatedAt
+  User             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-model InventoryItem {
-  id        String   @id @default(uuid())
-  data      Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model SchemaField {
-  id         String   @id @default(uuid())
-  name       String   @unique
-  type       String
-  isRequired Boolean  @default(false)
-  badges     String[]
-  createdAt  DateTime @default(now())
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model AuditLog {
-  id                  String   @id @default(uuid())
+  id                  String   @id @default(cuid())
   timestamp           DateTime @default(now())
   userEmail           String
   rawNLPrompt         String
@@ -61,4 +33,114 @@ model AuditLog {
   zodValidationResult String?
   transactionId       String
   actionType          String
+  userId              String
+  User                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([timestamp])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  role        String
+  content     String
+  timestamp   DateTime    @default(now())
+  ChatSession ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, timestamp])
+}
+
+model ChatSession {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  ChatMessage ChatMessage[]
+  User        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+}
+
+model ExternalDBConnection {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  url       String
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model InventoryItem {
+  id        String   @id @default(cuid())
+  userId    String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SchemaField {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  type       String
+  isRequired Boolean  @default(false)
+  badges     String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  User      User     @relation(fields: [userId], references: [id])
+}
+
+model TokenUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  model     String
+  cost      Float?
+  action    String
+  sessionId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId])
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  company              String?
+  password             String
+  createdAt            DateTime              @default(now())
+  AIProviderConfig     AIProviderConfig[]
+  AuditLog             AuditLog[]
+  ChatSession          ChatSession[]
+  ExternalDBConnection ExternalDBConnection?
+  InventoryItem        InventoryItem[]
+  SchemaField          SchemaField[]
+  Session              Session[]
+  TokenUsage           TokenUsage[]
 }

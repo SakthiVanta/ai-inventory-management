@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import prisma from '@/lib/prisma';
 
 // Pharmaceutical inventory schema field definitions
 const SCHEMA_FIELDS = [
@@ -33,70 +34,67 @@ const INVENTORY_ITEMS = [
     { item_name: "Naloxone Nasal Spray", batch_number: "BATCH-2026-I3", ndc_code: "12345-678-09", quantity: 3, unit: "kits", expiry_date: "2027-01-10", storage_temperature: null },
 ];
 
-export async function POST() {
-    let pool: Pool | null = null;
+export async function POST(req: NextRequest) {
+    const auth = await requireAuth(req);
+    if (auth instanceof Response) return auth;
 
     try {
-        const connectionString = process.env.DATABASE_URL;
-        if (!connectionString) {
-            return NextResponse.json(
-                { error: 'DATABASE_URL not configured' },
-                { status: 400 }
-            );
-        }
+        const userId = auth.id;
 
-        pool = new Pool({
-            connectionString,
-            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-        });
-
-        // 1. Seed SchemaField (upsert — skip if already exists)
+        // 1. Seed SchemaField for this user
         let schemaCount = 0;
         for (const field of SCHEMA_FIELDS) {
             try {
-                await pool.query(
-                    `INSERT INTO "SchemaField" (id, name, type, "isRequired", badges, "createdAt")
-                     VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
-                     ON CONFLICT (name) DO NOTHING`,
-                    [field.name, field.type, field.isRequired, field.badges]
-                );
+                await prisma.schemaField.upsert({
+                    where: {
+                        userId_name: {
+                            userId,
+                            name: field.name,
+                        },
+                    },
+                    update: {},
+                    create: {
+                        userId,
+                        name: field.name,
+                        type: field.type,
+                        isRequired: field.isRequired,
+                        badges: field.badges,
+                    },
+                });
                 schemaCount++;
             } catch (e: any) {
                 console.error(`[SEED] SchemaField "${field.name}" failed:`, e.message);
             }
         }
 
-        // 2. Seed InventoryItem
+        // 2. Seed InventoryItem for this user
         let inventoryCount = 0;
         for (const item of INVENTORY_ITEMS) {
             try {
-                await pool.query(
-                    `INSERT INTO "InventoryItem" (id, data, "createdAt", "updatedAt")
-                     VALUES (gen_random_uuid(), $1, NOW(), NOW())
-                     RETURNING *`,
-                    [JSON.stringify(item)]
-                );
+                await prisma.inventoryItem.create({
+                    data: {
+                        userId,
+                        data: item,
+                    },
+                });
                 inventoryCount++;
             } catch (e: any) {
                 console.error(`[SEED] InventoryItem "${item.item_name}" failed:`, e.message);
             }
         }
 
-        console.log(`[SEED] Complete: ${schemaCount} schema fields, ${inventoryCount} inventory items`);
-
         return NextResponse.json({
             success: true,
+            message: `Seeded ${schemaCount} schema fields and ${inventoryCount} inventory items for user ${auth.email}`,
             schemaFields: schemaCount,
             inventoryItems: inventoryCount,
-            message: `Seeded ${schemaCount} schema fields and ${inventoryCount} inventory items`,
         });
+
     } catch (error: any) {
-        console.error('[SEED] Error:', error.message);
+        console.error('[SEED] Fatal error:', error);
         return NextResponse.json(
-            { error: 'Seed failed: ' + error.message },
+            { error: 'Failed to seed database: ' + (error.message || 'Unknown error') },
             { status: 500 }
         );
-    } finally {
-        if (pool) await pool.end();
     }
 }

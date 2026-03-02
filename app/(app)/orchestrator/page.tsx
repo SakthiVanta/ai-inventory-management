@@ -47,13 +47,14 @@ export default function OrchestratorPage() {
         deleteSession,
         setCurrentSession,
         getCurrentSession,
+        aiProviders
     } = useAppStore();
 
     // Load current session messages
     useEffect(() => {
         const session = getCurrentSession();
         if (session) {
-            setMessages(session.messages);
+            setMessages(session.messages || []);
         } else {
             // Create new session if none exists
             createNewSession();
@@ -62,7 +63,7 @@ export default function OrchestratorPage() {
 
     // Save messages to session
     useEffect(() => {
-        if (currentSessionId && messages.length > 0) {
+        if (currentSessionId && messages?.length > 0) {
             const lastMessage = messages[messages.length - 1];
             addMessageToSession(currentSessionId, { ...lastMessage, timestamp: new Date().toISOString() });
         }
@@ -83,7 +84,7 @@ export default function OrchestratorPage() {
         setCurrentSession(sessionId);
         const session = chatSessions.find(s => s.id === sessionId);
         if (session) {
-            setMessages(session.messages);
+            setMessages(session.messages || []);
         }
         setShowHistory(false);
     };
@@ -193,13 +194,8 @@ export default function OrchestratorPage() {
         ]);
 
         try {
-            const activeProvider = localStorage.getItem('asd-pharr-storage');
-            let apiKey = null;
-            if (activeProvider) {
-                const store = JSON.parse(activeProvider);
-                const active = store.state?.aiProviders?.find((p: any) => p.isActive);
-                apiKey = active?.apiKey;
-            }
+            const active = aiProviders.find((p: any) => p.isActive);
+            const apiKey = active?.apiKey;
 
             // Step 1: Understanding intent (completed)
             setTimeout(() => updateThinkingStep('1', 'completed'), 500);
@@ -396,7 +392,7 @@ export default function OrchestratorPage() {
 
                 {/* Messages */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.length === 0 ? (
+                    {(messages?.length === 0) ? (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 space-y-4">
                             <MessageSquare className="w-12 h-12" strokeWidth={1} />
                             <p>Start a conversation...</p>

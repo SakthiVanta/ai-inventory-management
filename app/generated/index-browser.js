@@ -120,46 +120,16 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
-exports.Prisma.UserScalarFieldEnum = {
-  id: 'id',
-  email: 'email',
-  company: 'company',
-  password: 'password',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.SessionScalarFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  token: 'token',
-  createdAt: 'createdAt',
-  expiresAt: 'expiresAt'
-};
-
 exports.Prisma.AIProviderConfigScalarFieldEnum = {
   id: 'id',
+  userId: 'userId',
   name: 'name',
   apiKey: 'apiKey',
   modelName: 'modelName',
   maxContextTokens: 'maxContextTokens',
   isActive: 'isActive',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.InventoryItemScalarFieldEnum = {
-  id: 'id',
-  data: 'data',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SchemaFieldScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  type: 'type',
-  isRequired: 'isRequired',
-  badges: 'badges',
-  createdAt: 'createdAt'
 };
 
 exports.Prisma.AuditLogScalarFieldEnum = {
@@ -171,7 +141,81 @@ exports.Prisma.AuditLogScalarFieldEnum = {
   cost: 'cost',
   zodValidationResult: 'zodValidationResult',
   transactionId: 'transactionId',
-  actionType: 'actionType'
+  actionType: 'actionType',
+  userId: 'userId'
+};
+
+exports.Prisma.ChatMessageScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  role: 'role',
+  content: 'content',
+  timestamp: 'timestamp'
+};
+
+exports.Prisma.ChatSessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  title: 'title',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ExternalDBConnectionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  url: 'url',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.InventoryItemScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  data: 'data',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.SchemaFieldScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  type: 'type',
+  isRequired: 'isRequired',
+  badges: 'badges',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.SessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  token: 'token',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+};
+
+exports.Prisma.TokenUsageScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  amount: 'amount',
+  model: 'model',
+  cost: 'cost',
+  action: 'action',
+  sessionId: 'sessionId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  company: 'company',
+  password: 'password',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -201,12 +245,16 @@ exports.Prisma.JsonNullValueFilter = {
 
 
 exports.Prisma.ModelName = {
-  User: 'User',
-  Session: 'Session',
   AIProviderConfig: 'AIProviderConfig',
+  AuditLog: 'AuditLog',
+  ChatMessage: 'ChatMessage',
+  ChatSession: 'ChatSession',
+  ExternalDBConnection: 'ExternalDBConnection',
   InventoryItem: 'InventoryItem',
   SchemaField: 'SchemaField',
-  AuditLog: 'AuditLog'
+  Session: 'Session',
+  TokenUsage: 'TokenUsage',
+  User: 'User'
 };
 
 /**

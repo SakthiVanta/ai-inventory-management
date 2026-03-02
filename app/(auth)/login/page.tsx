@@ -1,6 +1,20 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { validateSession } from "@/lib/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session-token")?.value;
+
+    // If user is already authenticated, redirect to app
+    if (token) {
+        const user = await validateSession(token);
+        if (user) {
+            redirect("/orchestrator");
+        }
+    }
+
     return (
         <div className="flex min-h-screen bg-background text-foreground">
             {/* Left side: Animated/Visual Side */}
