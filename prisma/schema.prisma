@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  company   String?
+  password  String
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model AIProviderConfig {
+  id               String   @id @default(uuid())
+  name             String
+  apiKey           String
+  modelName        String
+  maxContextTokens Int
+  isActive         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model InventoryItem {
+  id        String   @id @default(uuid())
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SchemaField {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  type       String
+  isRequired Boolean  @default(false)
+  badges     String[]
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id                  String   @id @default(uuid())
+  timestamp           DateTime @default(now())
+  userEmail           String
+  rawNLPrompt         String
+  aiModelUsed         String
+  cost                Float
+  zodValidationResult String?
+  transactionId       String
+  actionType          String
+}
