@@ -211,6 +211,7 @@ export default function OrchestratorPage() {
                 body: JSON.stringify({
                     messages: [...messages, userMessage].map((m) => ({ role: m.role, content: m.content })),
                     apiKey: apiKey,
+                    customDbUrl: dbConnection.type === 'custom' && dbConnection.url ? dbConnection.url : undefined,
                 }),
             });
 

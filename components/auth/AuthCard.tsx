@@ -73,7 +73,7 @@ export function AuthCard() {
 
             if (mode === "login") {
                 toast.success("Welcome back!");
-                router.push("/");
+                router.push("/orchestrator");
             } else {
                 toast.success("Account created successfully!");
                 router.push("/setup-2fa");

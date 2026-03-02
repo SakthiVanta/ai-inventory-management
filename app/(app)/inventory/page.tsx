@@ -24,15 +24,25 @@ interface InventoryItem {
     createdAt: string;
 }
 
-// Sample medical inventory seed data
+// Sample medical inventory seed data (includes expired, expiring soon, and low-stock items)
 const SEED_DATA = [
+    // Normal items
     { item_name: "Paracetamol 500mg", batch_number: "BATCH-2026-A1", ndc_code: "12345-678-01", quantity: 500, unit: "boxes", expiry_date: "2026-12-15", storage_temperature: null },
-    { item_name: "Amoxicillin 250mg", batch_number: "BATCH-2026-B3", ndc_code: "12345-678-02", quantity: 200, unit: "bottles", expiry_date: "2026-04-01", storage_temperature: null },
-    { item_name: "Insulin Glargine", batch_number: "BATCH-2026-C7", ndc_code: "12345-678-03", quantity: 50, unit: "vials", expiry_date: "2026-03-20", storage_temperature: 4 },
     { item_name: "Metformin 500mg", batch_number: "BATCH-2026-D2", ndc_code: "12345-678-04", quantity: 1000, unit: "tablets", expiry_date: "2027-08-30", storage_temperature: null },
-    { item_name: "Epinephrine Auto-Injector", batch_number: "BATCH-2026-E5", ndc_code: "12345-678-05", quantity: 25, unit: "injectors", expiry_date: "2026-03-05", storage_temperature: 8 },
     { item_name: "Ibuprofen 400mg", batch_number: "BATCH-2026-F8", ndc_code: "12345-678-06", quantity: 750, unit: "bottles", expiry_date: "2026-11-20", storage_temperature: null },
     { item_name: "Aspirin 81mg", batch_number: "BATCH-2026-G2", ndc_code: "12345-678-07", quantity: 1200, unit: "tablets", expiry_date: "2027-02-28", storage_temperature: null },
+    { item_name: "Omeprazole 20mg", batch_number: "BATCH-2026-H9", ndc_code: "12345-678-08", quantity: 320, unit: "capsules", expiry_date: "2027-05-15", storage_temperature: null },
+    // Cold-chain items
+    { item_name: "Insulin Glargine", batch_number: "BATCH-2026-C7", ndc_code: "12345-678-03", quantity: 50, unit: "vials", expiry_date: "2026-06-20", storage_temperature: 4 },
+    { item_name: "mRNA Vaccine Dose", batch_number: "BATCH-2026-K1", ndc_code: "12345-678-11", quantity: 200, unit: "doses", expiry_date: "2026-09-01", storage_temperature: -20 },
+    // EXPIRED items (past dates)
+    { item_name: "Amoxicillin 250mg", batch_number: "BATCH-2025-B3", ndc_code: "12345-678-02", quantity: 45, unit: "bottles", expiry_date: "2025-11-30", storage_temperature: null },
+    { item_name: "Ciprofloxacin 500mg", batch_number: "BATCH-2025-J4", ndc_code: "12345-678-10", quantity: 120, unit: "tablets", expiry_date: "2026-01-15", storage_temperature: null },
+    // EXPIRING SOON (within 30 days)
+    { item_name: "Epinephrine Auto-Injector", batch_number: "BATCH-2026-E5", ndc_code: "12345-678-05", quantity: 25, unit: "injectors", expiry_date: "2026-03-20", storage_temperature: 8 },
+    { item_name: "Lorazepam 1mg", batch_number: "BATCH-2026-L6", ndc_code: "12345-678-12", quantity: 60, unit: "tablets", expiry_date: "2026-03-15", storage_temperature: null },
+    // LOW STOCK items
+    { item_name: "Naloxone Nasal Spray", batch_number: "BATCH-2026-I3", ndc_code: "12345-678-09", quantity: 3, unit: "kits", expiry_date: "2027-01-10", storage_temperature: null },
 ];
 
 function daysUntilExpiry(dateStr?: string) {
@@ -78,38 +88,17 @@ export default function InventoryPage() {
     const handleSeedData = async () => {
         setIsSeeding(true);
         try {
-            let addedCount = 0;
+            const res = await fetch('/api/seed', { method: 'POST' });
+            const data = await res.json();
 
-            for (const item of SEED_DATA) {
-                // Add to API if DB connected
-                if (dbConnection.connected) {
-                    const res = await fetch('/api/inventory', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(item),
-                    });
-
-                    if (res.ok) {
-                        const savedItem = await res.json();
-                        addInventoryItem(savedItem);
-                        addedCount++;
-                    }
-                } else {
-                    // Add to local state only
-                    const newItem = {
-                        id: crypto.randomUUID(),
-                        data: item,
-                        createdAt: new Date().toISOString(),
-                    };
-                    addInventoryItem(newItem);
-                    addedCount++;
-                }
+            if (!res.ok) {
+                throw new Error(data.error || 'Seed failed');
             }
 
-            toast.success(`Added ${addedCount} sample items to inventory`);
+            toast.success(data.message || `Seeded ${data.inventoryItems} items and ${data.schemaFields} schema fields`);
             fetchInventory();
-        } catch (error) {
-            toast.error('Failed to seed data');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to seed data');
         } finally {
             setIsSeeding(false);
         }
