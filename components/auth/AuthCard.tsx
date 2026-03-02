@@ -137,8 +137,8 @@ export function AuthCard() {
                 </CardTitle>
                 <CardDescription className="text-base font-medium">
                     {isLogin
-                        ? "Sign in to the ASD PHARR Inventory Platform."
-                        : "Sign up to the ASD PHARR Inventory Platform."
+                        ? "Sign in to the PHARR Inventory Platform."
+                        : "Sign up to the PHARR Inventory Platform."
                     }
                 </CardDescription>
             </CardHeader>
